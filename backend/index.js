@@ -21,6 +21,9 @@ db.defaults({
     articles: [],
     author: {
         name: 'Janko Hraško',
+        email: 'janko.hrasko@example.com',
+        // INSECURE!!!!
+        password: 'Password1!',
         avatar: 'https://pbs.twimg.com/profile_images/3420699490/e276a23510fd1b5d5b8dbc0933e4aebb.jpeg',
     },
 }).write();
@@ -38,6 +41,24 @@ const port = 9001;
 app.use(cors());
 app.use(morgan('common'));
 app.use(express.json());
+
+const checkAuth = (req, res, next) => {
+    if (req.headers.authorization) {
+        const authHeaders = req.headers.authorization.split(' ');
+        const authorization = Buffer.from(authHeaders[1], 'base64').toString('utf-8');
+        const [email, password] = authorization.split(':');
+        
+        const author = db.get('author').value();
+
+        if (author.email === email && author.password === password) {
+            next();
+        } else {
+            res.status(401).json();
+        }
+    } else {
+        res.status(401).json();
+    }
+};
 
 // This function will take request body and turn it into
 // a new article
@@ -60,6 +81,13 @@ const updateArticle = (article, body) => ({
     text: body.text,
 });
 
+const createComment = body => ({
+    id: Math.floor(Math.random() * (10000 - 1) + 1),
+    date: new Date().toLocaleString(),
+    author: body.author,
+    text: body.text,
+});
+
 // Heartbeat
 app.get('/', (req, res) => {
     res.json({ status: 'OK!' });
@@ -77,7 +105,7 @@ app.get('/articles', (req, res) => {
     res.json(articles);
 });
 
-app.post('/articles', (req, res) => {
+app.post('/articles', checkAuth, (req, res) => {
     const data = req.body;
     const article = createArticle(data);
 
@@ -92,6 +120,9 @@ app.get('/articles/:id', (req, res) => {
     const article = db.get('articles').find(x => x.id == req.params.id).value();
     
     if (article) {
+        article.views++;
+        db.write();
+
         res.json(article);
     } else {
         // 404 NOT FOUND
@@ -99,7 +130,7 @@ app.get('/articles/:id', (req, res) => {
     }
 });
 
-app.put('/articles/:id', (req, res) => {
+app.put('/articles/:id', checkAuth, (req, res) => {
     // Find existing article by its ID
     const article = db.get('articles').find(x => x.id == req.params.id).value();
     
@@ -125,7 +156,7 @@ app.put('/articles/:id', (req, res) => {
     }
 });
 
-app.delete('/articles/:id', (req, res) => {
+app.delete('/articles/:id', checkAuth, (req, res) => {
     // Find existing article index in list by its ID
     const articles = db.get('articles').value();
     const articleIndex = articles.findIndex(x => x.id == req.params.id);
@@ -138,6 +169,48 @@ app.delete('/articles/:id', (req, res) => {
 
         // 204 NO CONTENT
         res.status(204).json();
+    } else {
+        // 404 NOT FOUND
+        res.status(404).json();
+    }
+});
+
+app.post('/articles/:id/comments', (req, res) => {
+    // Find existing article by its ID
+    const article = db.get('articles').find(x => x.id == req.params.id).value();
+
+    if (article) {
+        const comment = createComment(req.body);
+        article.comments.push(comment);
+        db.write();
+
+        res.status(201).json(comment);
+    } else {
+        // 404 NOT FOUND
+        res.status(404).json();
+    }
+});
+
+app.delete('/articles/:articleId/comments/:commentId', checkAuth, (req, res) => {
+    // Find existing article by its ID
+    const article = db.get('articles').find(x => x.id == req.params.articleId).value();
+
+    if (article) {
+        // Find existing comment index in list by its ID
+        const commentIndex = article.comments.findIndex(x => x.id == req.params.commentId);
+    
+        if (commentIndex >= 0) {
+            // If article exists (index is not negative),
+            // remove it from the list & save to database
+            article.comments.splice(commentIndex, 1);
+            db.write();
+    
+            // 204 NO CONTENT
+            res.status(204).json();
+        } else {
+            // 404 NOT FOUND
+            res.status(404).json();
+        }
     } else {
         // 404 NOT FOUND
         res.status(404).json();

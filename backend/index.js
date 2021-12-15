@@ -42,6 +42,8 @@ app.use(cors());
 app.use(morgan('common'));
 app.use(express.json());
 
+// Our custom middleware to verify whether user is authenticated.
+// This middleware is then attached to protected endpoints.
 const checkAuth = (req, res, next) => {
     if (req.headers.authorization) {
         const authHeaders = req.headers.authorization.split(' ');
@@ -50,6 +52,7 @@ const checkAuth = (req, res, next) => {
         
         const author = db.get('author').value();
 
+        // Very dummy way of checking password - this will be enhanced in next seminar
         if (author.email === email && author.password === password) {
             next();
         } else {
@@ -81,6 +84,7 @@ const updateArticle = (article, body) => ({
     text: body.text,
 });
 
+// This function will take request body and turn it into a new comment
 const createComment = body => ({
     id: Math.floor(Math.random() * (10000 - 1) + 1),
     date: new Date().toLocaleString(),
@@ -174,6 +178,8 @@ app.delete('/articles/:id', checkAuth, (req, res) => {
         res.status(404).json();
     }
 });
+
+// Comments
 
 app.post('/articles/:id/comments', (req, res) => {
     // Find existing article by its ID

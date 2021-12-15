@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <title>Jožiho blog</title>
+</head>
+<body>
+    <div id="blog" class="">
+        <navbar></navbar>
+        <div class="flex">
+            <content></content>
+            <sidebar></sidebar>
+        </div>
+    </div>
+
+    <template id="loader">
+        <svg class="absolute top-4 left-1/2 animate-spin h-10 w-10 text-green-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </template>
+
+    <template id="navbar">
+        <nav class="w-full bg-yellow-600 text-white">
+            navigation
+        </nav>
+    </template>
+
+    <template id="sidebar">
+        <aside class="w-96">
+            sidebar
+        </aside>
+    </template>
+
+    <template id="content">
+        <main class="flex-1">
+            <component
+                :is="currentPage"
+                v-bind="currentProps"
+            >
+            </component>
+        </main>
+    </template>
+
+    <template id="page-index">
+        <div class="relative">
+            <loader v-if="articles === null"></loader>
+            <div v-if="articles && articles.length === 0">
+                <p>Prepáčte, ale blog neobsahuje žiadne články!</p>
+            </div>
+            <div v-for="article in articles" :key="article.id">
+                <h2 @click="openArticle(article.id)">{{ article.title }}</h2>
+            </div>
+        </div>
+    </template>
+
+    <template id="page-article">
+        <div class="relative">
+            <loader v-if="article === null"></loader>
+            <template v-else>
+                <h2>{{ article.title }}</h2>
+                <small>{{ article.date }}</small>
+                <div>
+                    {{ article.text }}
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <script src="https://unpkg.com/vue@next"></script>
+    <script>
+        const baseUrl = 'http://localhost:9001';
+
+        const Blog = {
+            data() {
+                return {
+                };
+            },
+        };
+
+        const app = Vue.createApp(Blog);
+
+        app.component('loader', {
+            template: '#loader',
+        });
+
+        app.component('navbar', {
+            template: '#navbar',
+        });
+
+        app.component('sidebar', {
+            template: '#sidebar',
+        });
+
+        app.component('content', {
+            template: '#content',
+
+            data() {
+                return {
+                    currentPage: 'page-index',
+                    currentProps: {},
+                };
+            },
+
+            methods: {
+                navigateTo(page, props = {}) {
+                    this.currentPage = page;
+                    this.currentProps = props;
+                },
+            },
+        });
+
+        app.component('page-index', {
+            template: '#page-index',
+
+            data() {
+                return {
+                    articles: null,
+                };
+            },
+
+            methods: {
+                openArticle(id) {
+                    this.$parent.navigateTo('page-article', {
+                        articleId: id,
+                    });
+                },
+            },
+
+            async mounted() {
+                const response = await fetch(`${baseUrl}/articles`);
+                const data = await response.json();
+                this.articles = data;
+            },
+        });
+
+        app.component('page-article', {
+            template: '#page-article',
+
+            props: {
+                articleId: {
+                    type: Number,
+                    required: true,
+                },
+            },
+
+            data() {
+                return {
+                    article: null,
+                };
+            },
+
+            async mounted() {
+                const response = await fetch(`${baseUrl}/articles/${this.articleId}`);
+                const data = await response.json();
+                this.article = data;
+            },
+        });
+        
+        app.mount('#blog');
+    </script>
+</body>
+</html>

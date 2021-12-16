@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 // Morgan is a logging middleware
 const morgan = require('morgan');
+const { scryptSync } = require('crypto');
 // LowDB is a file-based JSON database.
 // We are using version 1.0.0 as latest 3.0.0 requires
 // a bit different syntax and I want to keep things
@@ -22,8 +23,8 @@ db.defaults({
     author: {
         name: 'Janko Hraško',
         email: 'janko.hrasko@example.com',
-        // INSECURE!!!!
-        password: 'Password1!',
+        password: '5b6fc8cc48581b27eaaf41db75a581e76071861162c4df658687b41d5eda1849a45a51541d5083a93a608431eeabcb0a744df7d1555797160a353f6dc917b49c',
+        salt: 'dsfIUIO433gjh4564',
         avatar: 'https://pbs.twimg.com/profile_images/3420699490/e276a23510fd1b5d5b8dbc0933e4aebb.jpeg',
     },
 }).write();
@@ -52,8 +53,10 @@ const checkAuth = (req, res, next) => {
         
         const author = db.get('author').value();
 
+        const passwordHash = scryptSync(password, author.salt, 64).toString('hex');
+
         // Very dummy way of checking password - this will be enhanced in next seminar
-        if (author.email === email && author.password === password) {
+        if (author.email === email && author.password === passwordHash) {
             next();
         } else {
             res.status(401).json();
